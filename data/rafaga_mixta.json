@@ -1,0 +1,105 @@
+{
+ "kind": "sismolab-reports",
+ "reports": [
+  {
+   "station": "EST-A",
+   "event_id": 10,
+   "revision": 1,
+   "magnitude": 5.6,
+   "depth": 10.0,
+   "x": 300.0,
+   "y": 300.0,
+   "time": "2026-09-07T10:00:00Z"
+  },
+  {
+   "station": "EST-B",
+   "event_id": 10,
+   "revision": 1,
+   "magnitude": 5.6,
+   "depth": 10.0,
+   "x": 300.0,
+   "y": 300.0,
+   "time": "2026-09-07T10:00:00Z"
+  },
+  {
+   "station": "EST-C",
+   "event_id": 11,
+   "revision": 1,
+   "magnitude": 4.2,
+   "depth": 10.0,
+   "x": 305.0,
+   "y": 300.0,
+   "time": "2026-09-07T10:20:00Z"
+  },
+  {
+   "station": "EST-A",
+   "event_id": 12,
+   "revision": 1,
+   "magnitude": 6.1,
+   "depth": 10.0,
+   "x": 302.0,
+   "y": 300.0,
+   "time": "2026-09-07T09:55:00Z"
+  },
+  {
+   "station": "EST-B",
+   "event_id": 1,
+   "revision": 2,
+   "magnitude": 6.2,
+   "depth": 15.0,
+   "x": 300.0,
+   "y": 300.0,
+   "time": "2026-09-07T08:00:00Z"
+  },
+  {
+   "station": "EST-C",
+   "event_id": 1,
+   "revision": 1,
+   "magnitude": 4.8,
+   "depth": 70.0,
+   "x": 300.0,
+   "y": 300.0,
+   "time": "2026-09-07T08:00:00Z"
+  },
+  {
+   "station": "EST-A",
+   "event_id": 10,
+   "revision": 1,
+   "magnitude": 5.7,
+   "depth": 10.0,
+   "x": 300.0,
+   "y": 300.0,
+   "time": "2026-09-07T10:00:00Z"
+  },
+  {
+   "station": "EST-A",
+   "event_id": 3,
+   "revision": 2,
+   "magnitude": 1.0,
+   "depth": 5.0,
+   "x": 800.0,
+   "y": 100.0,
+   "time": "2026-09-07T07:00:00Z"
+  },
+  {
+   "station": "EST-X",
+   "event_id": 4,
+   "revision": 1,
+   "magnitude": 3.0,
+   "depth": 10.0,
+   "x": 300.0,
+   "y": 300.0,
+   "time": "2026-09-07T10:00:00Z"
+  },
+  {
+   "station": "EST-A",
+   "event_id": 13,
+   "revision": 1,
+   "magnitude": 99.0,
+   "depth": 10.0,
+   "x": 300.0,
+   "y": 300.0,
+   "time": "2026-09-07T10:00:00Z"
+  }
+ ]
+}

@@ -1,0 +1,141 @@
+{
+ "kind": "sismolab-state",
+ "state": {
+  "version": 1,
+  "mode": "normal",
+  "clock": "2026-09-07T12:00:00Z",
+  "params": {
+   "W": 48,
+   "R": 40,
+   "L": 3,
+   "T": 72
+  },
+  "stations": [
+   "EST-A",
+   "EST-B",
+   "EST-C"
+  ],
+  "zones": [
+   {
+    "name": "Valle Central",
+    "x1": 200.0,
+    "y1": 200.0,
+    "x2": 500.0,
+    "y2": 500.0,
+    "populated": true
+   },
+   {
+    "name": "Costa",
+    "x1": 500.0,
+    "y1": 0.0,
+    "x2": 1000.0,
+    "y2": 400.0,
+    "populated": false
+   },
+   {
+    "name": "Altiplano",
+    "x1": 0.0,
+    "y1": 600.0,
+    "x2": 400.0,
+    "y2": 1000.0,
+    "populated": true
+   }
+  ],
+  "tree": {
+   "root": 1,
+   "nodes": [
+    {
+     "id": 1,
+     "left": 2,
+     "right": 3,
+     "height": 1,
+     "balance": 0
+    },
+    {
+     "id": 2,
+     "left": null,
+     "right": null,
+     "height": 0,
+     "balance": 0
+    },
+    {
+     "id": 3,
+     "left": null,
+     "right": null,
+     "height": 0,
+     "balance": 0
+    }
+   ]
+  },
+  "active": [
+   {
+    "id": 1,
+    "magnitude": 4.8,
+    "depth": 70.0,
+    "x": 300.0,
+    "y": 300.0,
+    "time": "2026-09-07T08:00:00Z",
+    "revision": 1,
+    "stations": [
+     "EST-A"
+    ],
+    "attention": "pendiente",
+    "populated": true,
+    "priority": 2,
+    "reference_id": null
+   },
+   {
+    "id": 2,
+    "magnitude": 3.0,
+    "depth": 20.0,
+    "x": 900.0,
+    "y": 900.0,
+    "time": "2026-09-07T09:00:00Z",
+    "revision": 1,
+    "stations": [
+     "EST-A"
+    ],
+    "attention": "pendiente",
+    "populated": false,
+    "priority": 1,
+    "reference_id": null
+   },
+   {
+    "id": 3,
+    "magnitude": 5.0,
+    "depth": 20.0,
+    "x": 800.0,
+    "y": 100.0,
+    "time": "2026-09-07T07:00:00Z",
+    "revision": 1,
+    "stations": [
+     "EST-A"
+    ],
+    "attention": "pendiente",
+    "populated": false,
+    "priority": 2,
+    "reference_id": null
+   }
+  ],
+  "archived": [],
+  "deleted": [],
+  "queue": [],
+  "counters": {
+   "corrections": 0,
+   "confirmations": 0,
+   "conflicts": 0,
+   "discarded": 0,
+   "mass_archives": 0,
+   "archived_events": 0,
+   "reports_processed": 0
+  },
+  "rotation_stats": {
+   "LL": 0,
+   "RR": 0,
+   "LR": 0,
+   "RL": 0,
+   "left_rotations": 0,
+   "right_rotations": 0
+  }
+ }
+}

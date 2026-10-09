@@ -1,0 +1,583 @@
+{
+ "kind": "sismolab-insertions",
+ "clock": "2026-09-07T12:00:00Z",
+ "zones": [
+  {
+   "name": "Valle Central",
+   "x1": 200.0,
+   "y1": 200.0,
+   "x2": 500.0,
+   "y2": 500.0,
+   "populated": true
+  },
+  {
+   "name": "Costa",
+   "x1": 500.0,
+   "y1": 0.0,
+   "x2": 1000.0,
+   "y2": 400.0,
+   "populated": false
+  },
+  {
+   "name": "Altiplano",
+   "x1": 0.0,
+   "y1": 600.0,
+   "x2": 400.0,
+   "y2": 1000.0,
+   "populated": true
+  }
+ ],
+ "stations": [
+  "EST-A",
+  "EST-B",
+  "EST-C"
+ ],
+ "params": {
+  "W": 48,
+  "R": 40,
+  "L": 3,
+  "T": 72
+ },
+ "events": [
+  {
+   "id": 56,
+   "magnitude": 0.5,
+   "depth": 104.0,
+   "x": 153.0,
+   "y": 176.0,
+   "time": "2026-09-04T07:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 40,
+   "magnitude": 0.7,
+   "depth": 5.0,
+   "x": 809.0,
+   "y": 286.0,
+   "time": "2026-09-06T04:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 60,
+   "magnitude": 0.7,
+   "depth": 116.0,
+   "x": 934.0,
+   "y": 64.0,
+   "time": "2026-09-06T05:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 6,
+   "magnitude": 0.8,
+   "depth": 111.0,
+   "x": 136.0,
+   "y": 296.0,
+   "time": "2026-09-06T02:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 14,
+   "magnitude": 0.8,
+   "depth": 87.0,
+   "x": 79.0,
+   "y": 782.0,
+   "time": "2026-09-07T09:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 4,
+   "magnitude": 0.9,
+   "depth": 74.0,
+   "x": 126.0,
+   "y": 970.0,
+   "time": "2026-09-04T10:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 23,
+   "magnitude": 1.0,
+   "depth": 21.0,
+   "x": 237.0,
+   "y": 674.0,
+   "time": "2026-09-04T00:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 2,
+   "magnitude": 1.1,
+   "depth": 76.0,
+   "x": 59.0,
+   "y": 931.0,
+   "time": "2026-09-07T03:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 3,
+   "magnitude": 1.1,
+   "depth": 55.0,
+   "x": 71.0,
+   "y": 246.0,
+   "time": "2026-09-03T08:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 46,
+   "magnitude": 1.1,
+   "depth": 94.0,
+   "x": 405.0,
+   "y": 474.0,
+   "time": "2026-09-06T11:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 29,
+   "magnitude": 1.2,
+   "depth": 78.0,
+   "x": 53.0,
+   "y": 104.0,
+   "time": "2026-09-03T09:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 7,
+   "magnitude": 1.3,
+   "depth": 41.0,
+   "x": 573.0,
+   "y": 835.0,
+   "time": "2026-09-04T01:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 55,
+   "magnitude": 1.5,
+   "depth": 67.0,
+   "x": 19.0,
+   "y": 893.0,
+   "time": "2026-09-06T02:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 59,
+   "magnitude": 1.7,
+   "depth": 7.0,
+   "x": 790.0,
+   "y": 100.0,
+   "time": "2026-09-07T07:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 42,
+   "magnitude": 1.9,
+   "depth": 31.0,
+   "x": 481.0,
+   "y": 201.0,
+   "time": "2026-09-05T03:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 52,
+   "magnitude": 1.9,
+   "depth": 66.0,
+   "x": 246.0,
+   "y": 782.0,
+   "time": "2026-09-07T05:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 20,
+   "magnitude": 2.1,
+   "depth": 52.0,
+   "x": 938.0,
+   "y": 892.0,
+   "time": "2026-09-06T01:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 22,
+   "magnitude": 2.3,
+   "depth": 55.0,
+   "x": 367.0,
+   "y": 699.0,
+   "time": "2026-09-06T03:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 33,
+   "magnitude": 2.5,
+   "depth": 20.0,
+   "x": 104.0,
+   "y": 767.0,
+   "time": "2026-09-05T11:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 1,
+   "magnitude": 2.6,
+   "depth": 21.0,
+   "x": 404.0,
+   "y": 666.0,
+   "time": "2026-09-03T01:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 38,
+   "magnitude": 2.6,
+   "depth": 30.0,
+   "x": 627.0,
+   "y": 830.0,
+   "time": "2026-09-04T03:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 15,
+   "magnitude": 2.7,
+   "depth": 46.0,
+   "x": 608.0,
+   "y": 508.0,
+   "time": "2026-09-07T07:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 44,
+   "magnitude": 2.7,
+   "depth": 84.0,
+   "x": 86.0,
+   "y": 854.0,
+   "time": "2026-09-03T06:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 31,
+   "magnitude": 2.9,
+   "depth": 83.0,
+   "x": 258.0,
+   "y": 978.0,
+   "time": "2026-09-05T09:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 35,
+   "magnitude": 2.9,
+   "depth": 90.0,
+   "x": 556.0,
+   "y": 936.0,
+   "time": "2026-09-03T08:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 18,
+   "magnitude": 3.0,
+   "depth": 87.0,
+   "x": 355.0,
+   "y": 23.0,
+   "time": "2026-09-06T05:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 51,
+   "magnitude": 3.3,
+   "depth": 113.0,
+   "x": 199.0,
+   "y": 845.0,
+   "time": "2026-09-04T00:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 21,
+   "magnitude": 3.4,
+   "depth": 72.0,
+   "x": 284.0,
+   "y": 904.0,
+   "time": "2026-09-04T06:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 10,
+   "magnitude": 3.5,
+   "depth": 120.0,
+   "x": 464.0,
+   "y": 370.0,
+   "time": "2026-09-05T03:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 32,
+   "magnitude": 3.6,
+   "depth": 16.0,
+   "x": 869.0,
+   "y": 499.0,
+   "time": "2026-09-06T07:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 34,
+   "magnitude": 3.6,
+   "depth": 90.0,
+   "x": 165.0,
+   "y": 528.0,
+   "time": "2026-09-03T03:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 58,
+   "magnitude": 3.6,
+   "depth": 101.0,
+   "x": 108.0,
+   "y": 904.0,
+   "time": "2026-09-07T00:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 13,
+   "magnitude": 3.8,
+   "depth": 23.0,
+   "x": 775.0,
+   "y": 350.0,
+   "time": "2026-09-04T07:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 25,
+   "magnitude": 4.0,
+   "depth": 80.0,
+   "x": 579.0,
+   "y": 326.0,
+   "time": "2026-09-04T11:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 30,
+   "magnitude": 4.0,
+   "depth": 48.0,
+   "x": 628.0,
+   "y": 26.0,
+   "time": "2026-09-03T03:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 53,
+   "magnitude": 4.0,
+   "depth": 108.0,
+   "x": 134.0,
+   "y": 62.0,
+   "time": "2026-09-05T07:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 8,
+   "magnitude": 4.2,
+   "depth": 26.0,
+   "x": 381.0,
+   "y": 99.0,
+   "time": "2026-09-07T11:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 9,
+   "magnitude": 4.2,
+   "depth": 81.0,
+   "x": 210.0,
+   "y": 508.0,
+   "time": "2026-09-07T06:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 5,
+   "magnitude": 4.3,
+   "depth": 9.0,
+   "x": 590.0,
+   "y": 599.0,
+   "time": "2026-09-06T00:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 54,
+   "magnitude": 4.3,
+   "depth": 117.0,
+   "x": 529.0,
+   "y": 430.0,
+   "time": "2026-09-07T02:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 19,
+   "magnitude": 4.5,
+   "depth": 65.0,
+   "x": 60.0,
+   "y": 223.0,
+   "time": "2026-09-05T02:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 28,
+   "magnitude": 4.6,
+   "depth": 9.0,
+   "x": 195.0,
+   "y": 68.0,
+   "time": "2026-09-04T07:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 43,
+   "magnitude": 4.6,
+   "depth": 117.0,
+   "x": 624.0,
+   "y": 860.0,
+   "time": "2026-09-03T07:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 11,
+   "magnitude": 5.0,
+   "depth": 33.0,
+   "x": 83.0,
+   "y": 588.0,
+   "time": "2026-09-05T08:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 41,
+   "magnitude": 5.0,
+   "depth": 46.0,
+   "x": 457.0,
+   "y": 827.0,
+   "time": "2026-09-05T05:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 17,
+   "magnitude": 5.1,
+   "depth": 84.0,
+   "x": 591.0,
+   "y": 697.0,
+   "time": "2026-09-06T04:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 47,
+   "magnitude": 5.2,
+   "depth": 23.0,
+   "x": 130.0,
+   "y": 28.0,
+   "time": "2026-09-04T09:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 57,
+   "magnitude": 5.2,
+   "depth": 73.0,
+   "x": 63.0,
+   "y": 333.0,
+   "time": "2026-09-07T08:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 39,
+   "magnitude": 5.3,
+   "depth": 31.0,
+   "x": 204.0,
+   "y": 530.0,
+   "time": "2026-09-06T05:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 45,
+   "magnitude": 5.4,
+   "depth": 63.0,
+   "x": 910.0,
+   "y": 182.0,
+   "time": "2026-09-06T10:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 27,
+   "magnitude": 5.7,
+   "depth": 52.0,
+   "x": 407.0,
+   "y": 408.0,
+   "time": "2026-09-06T01:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 48,
+   "magnitude": 5.7,
+   "depth": 20.0,
+   "x": 626.0,
+   "y": 846.0,
+   "time": "2026-09-07T07:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 50,
+   "magnitude": 5.7,
+   "depth": 94.0,
+   "x": 665.0,
+   "y": 105.0,
+   "time": "2026-09-07T11:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 24,
+   "magnitude": 5.9,
+   "depth": 25.0,
+   "x": 269.0,
+   "y": 288.0,
+   "time": "2026-09-03T02:00:00Z",
+   "station": "EST-B"
+  },
+  {
+   "id": 16,
+   "magnitude": 6.0,
+   "depth": 36.0,
+   "x": 485.0,
+   "y": 713.0,
+   "time": "2026-09-03T00:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 12,
+   "magnitude": 6.2,
+   "depth": 95.0,
+   "x": 459.0,
+   "y": 294.0,
+   "time": "2026-09-07T01:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 37,
+   "magnitude": 6.4,
+   "depth": 47.0,
+   "x": 790.0,
+   "y": 228.0,
+   "time": "2026-09-07T08:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 49,
+   "magnitude": 6.6,
+   "depth": 21.0,
+   "x": 561.0,
+   "y": 561.0,
+   "time": "2026-09-04T00:00:00Z",
+   "station": "EST-A"
+  },
+  {
+   "id": 26,
+   "magnitude": 6.7,
+   "depth": 85.0,
+   "x": 692.0,
+   "y": 757.0,
+   "time": "2026-09-03T07:00:00Z",
+   "station": "EST-C"
+  },
+  {
+   "id": 36,
+   "magnitude": 6.9,
+   "depth": 112.0,
+   "x": 93.0,
+   "y": 712.0,
+   "time": "2026-09-05T08:00:00Z",
+   "station": "EST-B"
+  }
+ ]
+}

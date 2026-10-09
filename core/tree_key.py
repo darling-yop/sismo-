@@ -1,7 +1,12 @@
-"""TreeKey: the ordered key K = (P, M, I) used by the AVL and the BST."""
+"""TreeKey: the ordered key K = (P, M, I) used by the AVL and the BST.
+
+Tuple ordering compares priority first, then magnitude, then identifier.
+"""
 
 
 class TreeKey:
+    __slots__ = ("priority", "magnitude", "event_id")
+
     def __init__(self, priority, magnitude, event_id):
         self.priority = priority
         self.magnitude = magnitude
@@ -17,7 +22,7 @@ class TreeKey:
         return self.as_tuple() > other.as_tuple()
 
     def __eq__(self, other):
-        return self.as_tuple() == other.as_tuple()
+        return isinstance(other, TreeKey) and self.as_tuple() == other.as_tuple()
 
     def __hash__(self):
         return hash(self.as_tuple())

@@ -98,6 +98,30 @@ class BinaryTree:
         self._fix_path(path)
         return True
 
+    def remove_subtree(self, key):
+        """Detach the subtree rooted at key and return the number of nodes."""
+        path = []
+        current = self.root
+        while current is not None and key != current.key:
+            path.append(current)
+            current = current.left if key < current.key else current.right
+        if current is None:
+            return 0
+
+        count, stack = 0, Stack()
+        stack.push(current)
+        while not stack.is_empty():
+            node = stack.pop()
+            count += 1
+            if node.left is not None:
+                stack.push(node.left)
+            if node.right is not None:
+                stack.push(node.right)
+        self._replace_child(path[-1] if path else None, current, None)
+        self.size -= count
+        self._fix_path(path)
+        return count
+
     def inorder(self):
         return [node.key for node in self.nodes()]
 
