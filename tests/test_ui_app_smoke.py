@@ -41,6 +41,10 @@ class Widget:
 
     def after(self, delay, fn):
         self.after_calls.append(fn)
+        return fn
+
+    def after_cancel(self, callback):
+        self.after_calls.remove(callback)
 
 
 class Notebook(Widget):
@@ -167,6 +171,37 @@ class AppSmokeTest(unittest.TestCase):
         self.assertFalse(app.running)
         app.stop_continuous()
         app.send_draft()                              # empty draft: message only
+
+    def test_continuous_queue_does_not_duplicate_ticks_and_pause_cancels(self):
+        app = self.app
+        reports = [
+            dict(station="A", event_id=i, revision=1, magnitude="1.0", depth="10.0",
+                 x="1.0", y="1.0", time=T)
+            for i in range(1, 4)
+        ]
+        self.assertTrue(app.ctl.enqueue(reports).ok)
+
+        app.start_continuous()
+        self.assertEqual(len(app.ctl.queue), 2)
+        self.assertEqual(sum(callback == app._tick for callback in app.root.after_calls), 1)
+
+        app.start_continuous()
+        self.assertEqual(len(app.ctl.queue), 2)
+        self.assertEqual(sum(callback == app._tick for callback in app.root.after_calls), 1)
+
+        app.stop_continuous()
+        self.assertFalse(any(callback == app._tick for callback in app.root.after_calls))
+        self.assertIsNone(app._queue_after)
+
+        app.start_continuous()
+        self.assertEqual(len(app.ctl.queue), 1)
+        pending = [callback for callback in app.root.after_calls if callback == app._tick]
+        app.root.after_calls = [
+            callback for callback in app.root.after_calls if callback != app._tick]
+        for callback in pending:
+            callback()
+        self.assertEqual(len(app.ctl.queue), 0)
+        self.assertFalse(app.running)
 
     def test_files_versions_archive_audit_queries(self):
         app = self.app

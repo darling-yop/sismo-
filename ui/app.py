@@ -9,16 +9,19 @@ import tkinter as tk
 from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
 
-from domain.models import format_time
+from domain.metrics import indicators
+from domain.models import ValidationError, format_time, parse_decimal, parse_id, parse_time
 from services.persistence import DEFAULT_VERSIONS_DIR
 from ui import drawing
 from ui.controller import Controller, Outcome, sid
+from ui import theme, tree_canvas, widgets
 
 JSON_TYPES = [("Archivos JSON", "*.json"), ("Todos los archivos", "*.*")]
 BURST_FIELDS = [("station", "Estación"), ("event_id", "Evento (id)"), ("revision", "Revisión"),
                 ("magnitude", "Magnitud"), ("depth", "Prof. H (km)"), ("x", "x (km)"),
                 ("y", "y (km)"), ("time", "Hora ISO UTC")]
-EVENT_FIELDS = [("id", "Identificador"), ("magnitude", "Magnitud"), ("depth", "Profundidad H (km)"),
+EVENT_FIELDS = [("id", "ID (p. ej. SIS-12)"), ("magnitude", "Magnitud M (1 decimal)"),
+                ("depth", "Prof. H (km)"),
                 ("x", "x (km)"), ("y", "y (km)"), ("time", "Hora ISO UTC"), ("station", "Estación")]
 CORRECT_FIELDS = [("magnitude", "Magnitud"), ("depth", "Profundidad H"), ("x", "x"), ("y", "y"),
                   ("time", "Hora ISO UTC")]
@@ -29,14 +32,19 @@ EVENT_COLUMNS = [("id", 90), ("estado", 70), ("P", 30), ("M", 40), ("H", 45), ("
 
 # ---------- small widget helpers ----------
 
-def form(parent, fields, row=0, defaults=None, width=18):
+def form(parent, fields, row=0, defaults=None, width=18, on_enter=None):
     """Grid of label + entry. Returns {name: StringVar}."""
     variables = {}
     for offset, (name, label) in enumerate(fields):
-        ttk.Label(parent, text=label).grid(row=row + offset, column=0, sticky="w", padx=3, pady=1)
+        field_row = row + offset * 2
+        ttk.Label(parent, text=label).grid(row=field_row, column=0, sticky="w", padx=3, pady=(4, 1))
         var = tk.StringVar(value=(defaults or {}).get(name, ""))
-        ttk.Entry(parent, textvariable=var, width=width).grid(row=row + offset, column=1, padx=3, pady=1)
+        entry = ttk.Entry(parent, textvariable=var, width=width)
+        entry.grid(row=field_row + 1, column=0, sticky="ew", padx=3, pady=(0, 3))
+        if on_enter:
+            entry.bind("<Return>", lambda _event, callback=on_enter: callback())
         variables[name] = var
+    parent.columnconfigure(0, weight=1)
     return variables
 
 
@@ -61,7 +69,10 @@ def fill(tree, rows):
 
 def text_box(parent, height=8, width=60):
     frame = ttk.Frame(parent)
-    box = tk.Text(frame, height=height, width=width, wrap="word", font=("Consolas", 9))
+    box = tk.Text(frame, height=height, width=width, wrap="word", font=theme.FONTS["mono"],
+                  bg=theme.PALETTE["surface"], fg=theme.PALETTE["text"],
+                  insertbackground=theme.PALETTE["text"], relief="flat",
+                  highlightthickness=0, borderwidth=0)
     bar = ttk.Scrollbar(frame, orient="vertical", command=box.yview)
     box.configure(yscrollcommand=bar.set, state="disabled")
     box.pack(side="left", fill="both", expand=True)
@@ -78,7 +89,8 @@ def set_text(box, content):
 
 def canvas_with_bars(parent, width=600, height=400):
     frame = ttk.Frame(parent)
-    canvas = tk.Canvas(frame, width=width, height=height, bg="white", highlightthickness=0)
+    canvas = tk.Canvas(frame, width=width, height=height, bg=theme.PALETTE["background"],
+                       highlightthickness=0)
     hbar = ttk.Scrollbar(frame, orient="horizontal", command=canvas.xview)
     vbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
     canvas.configure(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
@@ -94,16 +106,38 @@ class App:
         self.ctl = controller or Controller()
         self.selected = None              # selected event id
         self.running = False              # continuous queue processing
+        self._queue_after = None
         self.versions_folder = tk.StringVar(value=DEFAULT_VERSIONS_DIR)
         self.tab_refresh = {}
         self.tree_hits, self.plane_hits, self.draft = [], [], []
+        self.new_vars = {
+            name: tk.StringVar(value=format_time(self.ctl.catalog.clock) if name == "time" else "")
+            for name, _label in EVENT_FIELDS
+        }
+        self.fix_id = tk.StringVar()
+        self.fix_vars = {name: tk.StringVar() for name, _label in CORRECT_FIELDS}
+        self._quick_touched = set()
+        self._tree_structure = None
+        self._rotation_stats = None
+        self._rotated_nodes = set()
+        self._rotation_after = None
+        self._rotation_animation = None
+        self._rotation_frame = 0
+        self._stress_flash = False
+        theme.configure_styles(root)
+        root.configure(bg=theme.PALETTE["background"])
         root.title("SismoLab AVL")
-        root.geometry("1280x800")
+        root.geometry("1440x900")
         self._build_toolbar()
+        self._build_metrics()
         self._build_notebook()
         self._build_log()
+        self._build_sidebar()
+        self._build_inspector()
         self.say(self._ok("Bienvenida a SismoLab AVL. Cargue un archivo o cree eventos."))
         self.refresh()
+        if hasattr(root, "_w"):
+            self._blink_stress()
 
     # ---------- feedback ----------
 
@@ -137,38 +171,57 @@ class App:
     # ---------- toolbar, log ----------
 
     def _build_toolbar(self):
-        bar = ttk.Frame(self.root)
-        bar.pack(fill="x", padx=4, pady=3)
-        ttk.Button(bar, text="Deshacer", command=lambda: self.act(self.ctl.undo())).pack(side="left", padx=2)
-        self.stress_btn = ttk.Button(bar, text="Activar modo estrés", command=self.toggle_stress)
-        self.stress_btn.pack(side="left", padx=2)
-        ttk.Button(bar, text="Recuperación global", command=lambda: self.act(self.ctl.recover())
-                   ).pack(side="left", padx=2)
-        ttk.Button(bar, text="Reanudar cola", command=lambda: self.act(self.ctl.resume())
-                   ).pack(side="left", padx=2)
-        ttk.Separator(bar, orient="vertical").pack(side="left", fill="y", padx=6)
+        bar = ttk.Frame(self.root, padding=(12, 9))
+        bar.pack(fill="x")
+        ttk.Label(bar, text="◈ SISMO / AVL", style="Brand.TLabel").pack(side="left", padx=(0, 16))
+        self.clock_label = ttk.Label(bar, text="", style="Muted.TLabel")
+        self.clock_label.pack(side="left", padx=8)
+        self.mode_badge = ttk.Label(bar, text="NORMAL", style="ModeNormal.TLabel")
+        self.mode_badge.pack(side="left", padx=8)
+        self.stress_btn = ttk.Button(bar, text="Cambiar modo", command=self.toggle_stress)
+        self.stress_btn.pack(side="left", padx=4)
+        ttk.Button(bar, text="Deshacer  Ctrl+Z", command=lambda: self.act(self.ctl.undo())
+                   ).pack(side="right", padx=3)
         self.hours = tk.StringVar(value="24")
-        ttk.Label(bar, text="Reloj +h").pack(side="left")
-        ttk.Entry(bar, textvariable=self.hours, width=5).pack(side="left", padx=2)
-        ttk.Button(bar, text="Avanzar", command=lambda: self.act(self.ctl.advance_clock(self.hours.get()))
-                   ).pack(side="left", padx=2)
-        ttk.Separator(bar, orient="vertical").pack(side="left", fill="y", padx=6)
+        ttk.Button(bar, text="Avanzar reloj", command=lambda: self.act(
+            self.ctl.advance_clock(self.hours.get()))).pack(side="right", padx=3)
+        ttk.Entry(bar, textvariable=self.hours, width=5).pack(side="right", padx=3)
+        ttk.Label(bar, text="+ horas", style="Muted.TLabel").pack(side="right", padx=3)
+        ttk.Button(bar, text="Recuperar AVL", command=lambda: self.act(self.ctl.recover())
+                   ).pack(side="right", padx=3)
+        ttk.Button(bar, text="Reanudar cola", command=lambda: self.act(self.ctl.resume())
+                   ).pack(side="right", padx=3)
+        self.stress_btn.configure(style="TButton")
+        self.root.bind("<Control-z>", lambda _event: self.act(self.ctl.undo()))
+        self.root.bind("<Control-Z>", lambda _event: self.act(self.ctl.undo()))
         self.params = {}
         for name in ("W", "R", "L", "T"):
-            ttk.Label(bar, text=name).pack(side="left")
             self.params[name] = tk.StringVar()
-            ttk.Entry(bar, textvariable=self.params[name], width=5).pack(side="left", padx=2)
-        ttk.Button(bar, text="Aplicar", command=self.apply_params).pack(side="left", padx=2)
-        self.clock_label = ttk.Label(bar, text="")
-        self.clock_label.pack(side="right", padx=6)
-        self.banner = tk.Label(self.root, text="", fg="white", bg="#b71c1c", font=("Segoe UI", 10, "bold"))
+        self.banner = ttk.Label(self.root, text="", style="Banner.TLabel")
+
+    def _build_metrics(self):
+        strip = ttk.Frame(self.root, padding=(8, 4))
+        strip.pack(fill="x")
+        self.metric_values = {}
+        specs = (("activos", "ACTIVOS"), ("archived", "ARCHIVADOS"),
+                 ("deleted", "ELIMINADOS"), ("queue", "COLA"), ("pending", "PENDIENTES"),
+                 ("costly_access", "COSTOSOS"), ("height", "ALTURA"), ("leaves", "HOJAS"),
+                 ("balance", "BALANCE"), ("LL", "LL"), ("RR", "RR"), ("LR", "LR"), ("RL", "RL"))
+        for column, (key, title) in enumerate(specs):
+            card, value = widgets.metric_card(strip, title)
+            card.grid(row=0, column=column, sticky="ew", padx=2)
+            strip.columnconfigure(column, weight=1)
+            self.metric_values[key] = value
 
     def _build_log(self):
-        ttk.Label(self.root, text="¿Qué ocurrió y por qué?").pack(anchor="w", padx=6)
-        frame, self.log = text_box(self.root, height=6, width=150)
-        self.log.tag_configure("error", foreground="#b71c1c")
-        self.log.tag_configure("ok", foreground="#1b5e20")
-        frame.pack(fill="x", padx=4, pady=3)
+        log_panel = ttk.Frame(self.root, style="Surface.TFrame", padding=(8, 5))
+        log_panel.pack(fill="x", padx=8, pady=(0, 7))
+        ttk.Label(log_panel, text="REGISTRO DE ACCIONES · qué ocurrió y por qué",
+                  style="Card.TLabel").pack(anchor="w")
+        frame, self.log = text_box(log_panel, height=4, width=150)
+        self.log.tag_configure("error", foreground=theme.PALETTE["error"])
+        self.log.tag_configure("ok", foreground=theme.PALETTE["ok"])
+        frame.pack(fill="x", pady=(4, 0))
 
     def toggle_stress(self):
         self.act(self.ctl.set_stress(not self.ctl.catalog.avl.stress))
@@ -179,13 +232,42 @@ class App:
     # ---------- notebook ----------
 
     def _build_notebook(self):
-        self.nb = ttk.Notebook(self.root)
-        self.nb.pack(fill="both", expand=True, padx=4, pady=3)
-        builders = [("Árbol AVL", self._tab_tree), ("Comparación BST", self._tab_compare),
-                    ("Plano geográfico", self._tab_plane), ("Eventos", self._tab_events),
+        workspace = ttk.Frame(self.root)
+        workspace.pack(fill="both", expand=True, padx=8, pady=(2, 7))
+        sidebar_frame = ttk.Frame(workspace, style="Surface.TFrame", width=278)
+        sidebar_frame.pack(side="left", fill="y", padx=(0, 7))
+        sidebar_frame.pack_propagate(False)
+        self.sidebar_canvas = tk.Canvas(
+            sidebar_frame, bg=theme.PALETTE["surface"], highlightthickness=0)
+        self.sidebar_scrollbar = ttk.Scrollbar(
+            sidebar_frame, orient="vertical", command=self.sidebar_canvas.yview)
+        self.sidebar_canvas.configure(yscrollcommand=self.sidebar_scrollbar.set)
+        self.sidebar_scrollbar.pack(side="right", fill="y")
+        self.sidebar_canvas.pack(side="left", fill="both", expand=True)
+        self.sidebar = ttk.Frame(self.sidebar_canvas, style="Surface.TFrame", padding=7)
+        self._sidebar_window = self.sidebar_canvas.create_window(
+            (0, 0), window=self.sidebar, anchor="nw")
+        self.sidebar.bind(
+            "<Configure>",
+            lambda _event: self.sidebar_canvas.configure(
+                scrollregion=self.sidebar_canvas.bbox("all")))
+        self.sidebar_canvas.bind(
+            "<Configure>",
+            lambda event: self.sidebar_canvas.itemconfigure(
+                self._sidebar_window, width=event.width))
+        self.inspector = ttk.Frame(workspace, style="Surface.TFrame", width=278, padding=7)
+        self.inspector.pack(side="right", fill="y", padx=(7, 0))
+        self.inspector.pack_propagate(False)
+        center = ttk.Frame(workspace)
+        center.pack(side="left", fill="both", expand=True)
+        self.workspace = workspace
+        self.nb = ttk.Notebook(center)
+        self.nb.pack(fill="both", expand=True)
+        builders = [("Árbol AVL", self._tab_tree), ("BST", self._tab_compare),
+                    ("Plano", self._tab_plane), ("Eventos", self._tab_events),
                     ("Cola", self._tab_queue), ("Histórico", self._tab_history),
-                    ("Archivos y versiones", self._tab_files), ("Auditoría", self._tab_audit),
-                    ("Consultas", self._tab_queries)]
+                    ("Archivos", self._tab_files), ("Auditoría", self._tab_audit),
+                    ("Consultas", self._tab_queries), ("Indicadores", self._tab_indicators)]
         self.tab_names = []
         for name, build in builders:
             frame = ttk.Frame(self.nb)
@@ -196,15 +278,20 @@ class App:
 
     def refresh(self):
         c = self.ctl.catalog
-        self.stress_btn.configure(text="Volver a modo normal" if c.avl.stress else "Activar modo estrés")
-        self.clock_label.configure(text=f"Reloj: {format_time(c.clock)}   Cola: {len(self.ctl.queue)}"
-                                        f"{'   (en pausa)' if self.ctl.sc.paused else ''}")
+        self.stress_btn.configure(text="Cambiar modo")
+        self.mode_badge.configure(text="ESTRÉS" if c.avl.stress else "NORMAL",
+                                  style="ModeStress.TLabel" if c.avl.stress else "ModeNormal.TLabel")
+        self.clock_label.configure(text=f"UTC SIMULADO · {format_time(c.clock)}"
+                                        f"{' · COLA EN PAUSA' if self.ctl.sc.paused else ''}")
         for name, value in (("W", c.W), ("R", c.R), ("L", c.L), ("T", c.T)):
             self.params[name].set(str(value))
+        self._refresh_metrics()
+        self._refresh_active_events()
+        self._refresh_inspector()
         view_banner = self.ctl.tree_view(1)["banner"]
         if view_banner:
             self.banner.configure(text=view_banner)
-            self.banner.pack(fill="x", padx=4, before=self.nb)
+            self.banner.pack(fill="x", padx=8, before=self.workspace)
         else:
             self.banner.pack_forget()
         index = self.nb.index(self.nb.select())
@@ -212,39 +299,283 @@ class App:
         if refresher:
             refresher()
 
+    def _refresh_metrics(self):
+        data = indicators(self.ctl.catalog, self.ctl.queue)
+        c = self.ctl.catalog
+        root = c.avl.root
+        balance = 0 if root is None else c.avl.balance_factor(root)
+        values = {
+            "activos": data["active"], "archived": data["archived"],
+            "deleted": data["deleted"], "queue": data["queue"],
+            "pending": data["pending"], "costly_access": data["costly_access"],
+            "height": data["height"], "leaves": data["leaves"], "balance": f"{balance:+d}",
+            **{case: data["rotations"][case] for case in ("LL", "RR", "LR", "RL")},
+        }
+        for name, value in values.items():
+            self.metric_values[name].configure(text=str(value))
+
+    def _build_sidebar(self):
+        ttk.Label(self.sidebar, text="OPERACIONES", style="Card.TLabel").pack(anchor="w", pady=(1, 7))
+
+        card, body = widgets.collapsible_card(self.sidebar, "＋  Crear evento", expanded=True)
+        card.pack(fill="x", pady=6)
+        quick_fields = [field for field in EVENT_FIELDS if field[0] != "time"]
+        self.quick_entries = widgets.linked_form(
+            body, quick_fields, self.new_vars, width=13, on_enter=self.do_create)
+        self._quick_placeholders = {
+            "id": "Ej. SIS-000042", "magnitude": "Ej. 6.5",
+            "depth": "Ej. 10.0 km", "x": "Ej. 120.0 km",
+            "y": "Ej. 120.0 km", "station": "Código estación",
+        }
+        for name, placeholder in self._quick_placeholders.items():
+            widgets.set_placeholder(
+                self.quick_entries[name], self.new_vars[name], placeholder,
+                on_touch=lambda field=name: self._touch_quick_field(field))
+        picker, self.apply_utc_value, self.utc_valid, self.date_entry, self.time_entry = widgets.utc_picker(
+            body, self.new_vars["time"], format_time(self.ctl.catalog.clock),
+            on_change=lambda: self._touch_quick_field("time"))
+        picker.grid(row=2 * len(quick_fields), column=0, columnspan=2, sticky="ew", pady=3)
+        self.quick_validation = ttk.Label(body, text="", style="Validation.TLabel")
+        self.quick_validation.grid(row=2 * len(quick_fields) + 1, column=0, columnspan=2,
+                                   sticky="w", padx=3)
+        self.quick_submit = ttk.Button(body, text="Crear evento", style="Primary.TButton",
+                                       command=self.do_create)
+        self.quick_submit.grid(row=2 * len(quick_fields) + 2, column=0, columnspan=2,
+                               sticky="ew", padx=3, pady=(5, 2))
+        self._validate_quick_event()
+
+        card, body = widgets.collapsible_card(self.sidebar, "✎  Corregir / eliminar")
+        card.pack(fill="x", pady=6)
+        ttk.Label(body, text="Identificador", style="Card.TLabel").grid(
+            row=0, column=0, sticky="w", padx=3, pady=(4, 1))
+        fix_id_entry = ttk.Entry(body, textvariable=self.fix_id, width=13)
+        fix_id_entry.grid(row=1, column=0, columnspan=2, sticky="ew", padx=3, pady=2)
+        fix_id_entry.bind("<Return>", lambda _event: self.do_correct())
+        widgets.linked_form(body, CORRECT_FIELDS, self.fix_vars, width=13,
+                            on_enter=self.do_correct, row=2)
+        ttk.Label(body, text="Deje vacío lo que no cambia", style="Muted.TLabel").grid(
+            row=2 + 2 * len(CORRECT_FIELDS), column=0, columnspan=2,
+            sticky="w", padx=3, pady=2)
+        actions = ttk.Frame(body, style="Card.TFrame")
+        actions.grid(row=3 + 2 * len(CORRECT_FIELDS), column=0, columnspan=2, sticky="ew")
+        ttk.Button(actions, text="Corregir…", command=self.do_correct).pack(fill="x", pady=2)
+        ttk.Button(actions, text="Eliminar…", command=self.do_delete).pack(fill="x", pady=2)
+        ttk.Button(actions, text="Marcar revisado", command=self.do_review).pack(fill="x", pady=2)
+
+        card, body = widgets.collapsible_card(self.sidebar, "⌕  Buscar evento")
+        card.pack(fill="x", pady=6)
+        self.sidebar_search = tk.StringVar()
+        search = ttk.Entry(body, textvariable=self.sidebar_search)
+        search.pack(fill="x", pady=3)
+        search.bind("<Return>", lambda _event: self._search_sidebar_event())
+        ttk.Button(body, text="Abrir detalle", command=self._search_sidebar_event).pack(fill="x")
+
+        card, body = widgets.collapsible_card(self.sidebar, "⚙  Parámetros · W / R / L / T")
+        card.pack(fill="x", pady=6)
+        for row, name in enumerate(("W", "R", "L", "T")):
+            ttk.Label(body, text=name, style="Card.TLabel").grid(row=2 * row, column=0,
+                                                                  sticky="w", padx=3, pady=(4, 1))
+            ttk.Entry(body, textvariable=self.params[name], width=13).grid(
+                row=2 * row + 1, column=0, sticky="ew", padx=3, pady=(0, 3))
+        ttk.Button(body, text="Aplicar parámetros", command=self.apply_params).grid(
+            row=8, column=0, sticky="ew", padx=3, pady=4)
+
+        card, body = widgets.collapsible_card(self.sidebar, "▣  Archivo / versiones")
+        card.pack(fill="x", pady=6)
+        ttk.Button(body, text="Abrir archivos y versiones",
+                   command=lambda: self.nb.select(6)).pack(fill="x", pady=2)
+        ttk.Button(body, text="Histórico y archivo de ramas",
+                   command=lambda: self.nb.select(5)).pack(fill="x", pady=2)
+        widgets.Tooltip(search, "Busque un evento por SIS-000001 o por su identificador.")
+        for name, entry in self.quick_entries.items():
+            widgets.Tooltip(entry, self._quick_placeholders[name])
+
+    def _build_inspector(self):
+        ttk.Label(self.inspector, text="DETALLE DEL EVENTO", style="Card.TLabel").pack(anchor="w")
+        self.detail_values = {}
+        detail = ttk.Frame(self.inspector, style="Card.TFrame", padding=6)
+        detail.pack(fill="x", pady=(5, 9))
+        for row, (name, label) in enumerate((
+                ("id", "ID"), ("status", "Estado"), ("priority", "Prioridad"),
+                ("magnitude", "Magnitud"), ("depth", "Profundidad"),
+                ("location", "Epicentro"), ("time", "Hora UTC"),
+                ("revision", "Revisión"), ("tree", "Nodo AVL"))):
+            ttk.Label(detail, text=label, style="Muted.TLabel").grid(
+                row=row, column=0, sticky="w", padx=3, pady=3)
+            value = ttk.Label(detail, text="—", style="Card.TLabel", wraplength=160)
+            value.grid(row=row, column=1, sticky="e", padx=3, pady=3)
+            self.detail_values[name] = value
+        actions = ttk.Frame(detail, style="Card.TFrame")
+        actions.grid(row=len(self.detail_values), column=0, columnspan=2, sticky="ew", pady=(5, 3))
+        ttk.Button(actions, text="Marcar revisado", command=self.review_selected).pack(
+            side="left", expand=True, fill="x", padx=(0, 2))
+        ttk.Button(actions, text="Eliminar…", command=self.delete_selected).pack(
+            side="left", expand=True, fill="x", padx=(2, 0))
+        ttk.Label(detail, text="RECORRIDOS", style="Muted.TLabel").grid(
+            row=len(self.detail_values) + 1, column=0, columnspan=2, sticky="w", padx=3, pady=(5, 1))
+        self.travs = tk.Text(detail, height=7, wrap="word", font=theme.FONTS["ui"],
+                             bg=theme.PALETTE["surface"], fg=theme.PALETTE["text"],
+                             relief="flat", highlightthickness=0, borderwidth=0)
+        self.travs.grid(row=len(self.detail_values) + 2, column=0, columnspan=2, sticky="ew", padx=3)
+        self.travs.configure(state="disabled")
+        detail.columnconfigure(1, weight=1)
+        ttk.Label(self.inspector, text="EVENTOS ACTIVOS", style="Card.TLabel").pack(
+            anchor="w", pady=(3, 2))
+        self.active_filter = tk.StringVar()
+        search = ttk.Entry(self.inspector, textvariable=self.active_filter)
+        search.pack(fill="x", pady=(0, 4))
+        search.bind("<KeyRelease>", lambda _event: self._refresh_active_events())
+        frame, self.active_table = table(
+            self.inspector, [("id", 92), ("M", 42), ("P", 28), ("estado", 75)], height=16)
+        frame.pack(fill="both", expand=True)
+        self.active_table.bind("<<TreeviewSelect>>", self._pick_active_event)
+        self._style_text_box(self.travs)
+
+    @staticmethod
+    def _style_text_box(box):
+        box.configure(highlightthickness=0, relief="flat", borderwidth=0)
+
+    def _refresh_inspector(self):
+        values = {key: "—" for key in self.detail_values}
+        if self.selected is not None:
+            out = self.ctl.describe(self.selected)
+            if out.ok:
+                info = out.data
+                event = info["event"]
+                values.update({
+                    "id": sid(event.event_id),
+                    "status": info["status"],
+                    "priority": f"{event.priority} · {('alta' if event.priority == 3 else 'media' if event.priority == 2 else 'baja')}",
+                    "magnitude": f"{event.magnitude:.1f}",
+                    "depth": f"{event.depth:.1f} km",
+                    "location": f"{event.x:.1f}, {event.y:.1f} km",
+                    "time": format_time(event.time),
+                    "revision": str(event.revision),
+                    "tree": (f"h {info['height']} · fb {info['balance']:+d}"
+                             if info["status"] == "activo" else "Fuera del AVL"),
+                })
+        for key, value in values.items():
+            self.detail_values[key].configure(text=value)
+
+    def _refresh_active_events(self):
+        if not hasattr(self, "active_table"):
+            return
+        needle = self.active_filter.get().strip().casefold()
+        rows = []
+        for row in self.ctl.event_rows():
+            if row[1] != "activo":
+                continue
+            if needle and needle not in str(row[0]).casefold() and needle not in str(row[3]).casefold():
+                continue
+            rows.append((row[0], f"{float(row[3]):.1f}", row[2], row[9]))
+        fill(self.active_table, rows)
+
+    def _pick_active_event(self, _event):
+        picked = self.active_table.selection()
+        if picked:
+            values = self.active_table.item(picked[0], "values")
+            self.select(int(str(values[0]).replace("SIS-", "")))
+
+    def _search_sidebar_event(self):
+        out = self.ctl.describe(self.sidebar_search.get().strip())
+        self.say(out, popup=not out.ok)
+        if out.ok:
+            self.select(out.data["event"].event_id)
+
+    def _validate_quick_event(self):
+        if not hasattr(self, "quick_entries"):
+            return
+        values = {name: variable.get().strip() for name, variable in self.new_vars.items()}
+        for name, placeholder in self._quick_placeholders.items():
+            if values[name] == placeholder:
+                values[name] = ""
+        errors = {}
+        try:
+            parse_id(values["id"])
+        except ValidationError as error:
+            errors["id"] = str(error)
+        for name, label, low, high in (
+                ("magnitude", "la magnitud", -2.0, 10.0),
+                ("depth", "la profundidad", 0.0, 700.0),
+                ("x", "la coordenada x", 0.0, 1000.0),
+                ("y", "la coordenada y", 0.0, 1000.0)):
+            try:
+                parse_decimal(values[name], label, low, high)
+            except ValidationError as error:
+                errors[name] = str(error)
+        if not self.utc_valid["value"]:
+            errors["time"] = "Use AAAA-MM-DD y HH:MM válidos."
+        else:
+            try:
+                moment = parse_time(values["time"])
+                if moment > self.ctl.catalog.clock:
+                    errors["time"] = "La fecha supera el reloj simulado."
+            except ValidationError as error:
+                errors["time"] = str(error)
+        try:
+            self.ctl.catalog.check_station(values["station"])
+        except ValidationError as error:
+            errors["station"] = str(error)
+        for name, entry in self.quick_entries.items():
+            if name in errors and name in self._quick_touched:
+                entry.configure(style="Invalid.TEntry")
+            elif name not in self._quick_touched and name in self._quick_placeholders:
+                entry.configure(style="Placeholder.TEntry")
+            else:
+                entry.configure(style="TEntry")
+        if "time" in errors and "time" in self._quick_touched:
+            self.date_entry.configure(style="Invalid.TEntry")
+            self.time_entry.configure(style="Invalid.TEntry")
+        if errors:
+            visible_error = next((errors[name] for name in self._quick_touched if name in errors), "")
+            self.quick_validation.configure(text=visible_error)
+            self.quick_submit.configure(state="disabled")
+        else:
+            self.quick_validation.configure(text="")
+            self.quick_submit.configure(state="normal")
+
+    def _touch_quick_field(self, name):
+        self._quick_touched.add(name)
+        self._validate_quick_event()
+
+    def _blink_stress(self):
+        if self.ctl.catalog.avl.stress:
+            self._stress_flash = not self._stress_flash
+            self.mode_badge.configure(style="ModeStress.TLabel" if self._stress_flash else
+                                      "ModeNormal.TLabel")
+        else:
+            self._stress_flash = False
+            self.mode_badge.configure(style="ModeNormal.TLabel")
+        self.root.after(550, self._blink_stress)
+
     def select(self, event_id):
         self.selected = event_id
+        self.fix_id.set(sid(event_id))
         self.refresh()
 
     # ---------- tab: AVL ----------
 
     def _tab_tree(self, tab):
-        top = ttk.Frame(tab)
+        ttk.Label(tab, text="Árbol AVL", style="Brand.TLabel").pack(anchor="w", padx=8, pady=(7, 0))
+        top = ttk.Frame(tab, padding=(7, 6))
         top.pack(fill="x")
         self.depth_var = tk.StringVar(value="12")
-        ttk.Label(top, text="Niveles visibles:").pack(side="left", padx=4)
+        ttk.Label(top, text="Niveles visibles").pack(side="left", padx=4)
         ttk.Spinbox(top, from_=1, to=60, width=4, textvariable=self.depth_var,
                     command=self.refresh).pack(side="left")
-        ttk.Button(top, text="Redibujar", command=self.refresh).pack(side="left", padx=6)
-        self.legend = tk.Canvas(top, width=640, height=26, bg="white", highlightthickness=0)
+        ttk.Button(top, text="Ajustar a pantalla", command=self._fit_tree).pack(side="left", padx=5)
+        ttk.Button(top, text="−", command=lambda: self.tree_nav.zoom_center(0.88)).pack(side="left")
+        ttk.Button(top, text="+", command=lambda: self.tree_nav.zoom_center(1.14)).pack(side="left")
+        self.legend = tk.Canvas(top, width=570, height=26, bg=theme.PALETTE["background"],
+                                highlightthickness=0)
         self.legend.pack(side="left", padx=8)
         body = ttk.Panedwindow(tab, orient="horizontal")
         body.pack(fill="both", expand=True)
         left, self.tree_canvas = canvas_with_bars(body, 820, 420)
-        right = ttk.Frame(body)
-        body.add(left, weight=4)
-        body.add(right, weight=1)
-        ttk.Label(right, text="Nodo seleccionado (clic en el árbol)").pack(anchor="w")
-        frame, self.node_info = text_box(right, height=14, width=38)
-        frame.pack(fill="both", expand=True)
-        row = ttk.Frame(right)
-        row.pack(fill="x", pady=3)
-        ttk.Button(row, text="Marcar revisado", command=self.review_selected).pack(side="left", padx=2)
-        ttk.Button(row, text="Eliminar…", command=self.delete_selected).pack(side="left", padx=2)
-        ttk.Label(right, text="Recorridos").pack(anchor="w")
-        frame, self.travs = text_box(right, height=7, width=38)
-        frame.pack(fill="x")
-        self.tree_canvas.bind("<Button-1>", self._click_tree)
+        self.tree_nav = tree_canvas.TreeCanvasNavigator(self.tree_canvas)
+        self._tree_fit_pending = False
+        body.add(left, weight=1)
+        self.tree_canvas.bind("<ButtonRelease-1>", self._click_tree, add="+")
 
         def refresh():
             try:
@@ -254,26 +585,63 @@ class App:
             view = self.ctl.tree_view(depth)
             self.legend.delete("all")
             drawing.draw_legend(self.legend)
+            signature = {eid: (node.left, node.right)
+                         for eid, node in view["layout"].nodes.items()}
+            rotation_stats = tuple(self.ctl.catalog.avl.stats[key]
+                                   for key in ("LL", "RR", "LR", "RL"))
+            if (self._rotation_stats is not None and
+                    sum(rotation_stats) > sum(self._rotation_stats)):
+                self._rotated_nodes = {
+                    eid for eid in signature.keys() & self._tree_structure.keys()
+                    if signature[eid] != self._tree_structure[eid]
+                }
+                if self._rotation_after is not None:
+                    self.root.after_cancel(self._rotation_after)
+                self._rotation_after = self.root.after(1000, self._clear_rotation_highlight)
+            self._tree_structure = signature
+            self._rotation_stats = rotation_stats
             self.tree_hits = drawing.draw_tree(
                 self.tree_canvas, view["layout"], view["events"], view["costly"],
                 view["imbalanced"], self.selected,
-                title="AVL activo" + ("  (MODO ESTRÉS)" if view["stress"] else ""))
-            self._show_node_info()
+                rotated=self._rotated_nodes)
+            if self._rotated_nodes and self._rotation_animation is None and hasattr(self.root, "_w"):
+                self._rotation_frame = 0
+                self._animate_rotations()
+            self.tree_nav.apply_after_redraw()
+            if not self._tree_fit_pending:
+                self._tree_fit_pending = True
+                self.root.after_idle(self.tree_nav.fit)
             set_text(self.travs, self.ctl.traversal_text())
         return refresh
 
+    def _fit_tree(self):
+        self.tree_nav.fit()
+
+    def _clear_rotation_highlight(self):
+        self._rotated_nodes.clear()
+        self._rotation_after = None
+        self.refresh()
+
+    def _animate_rotations(self):
+        widths = (4, 5, 6, 5, 4, 3, 4, 5, 4)
+        if self._rotation_frame >= len(widths) or not self._rotated_nodes:
+            self._rotation_animation = None
+            return
+        self.tree_canvas.itemconfigure("rotation-highlight",
+                                       outline=theme.PALETTE["warning"],
+                                       width=widths[self._rotation_frame])
+        self._rotation_frame += 1
+        self._rotation_animation = self.root.after(110, self._animate_rotations)
+
     def _click_tree(self, event):
+        if self.tree_nav.dragged:
+            self.tree_nav.dragged = False
+            return
         x, y = self.tree_canvas.canvasx(event.x), self.tree_canvas.canvasy(event.y)
+        x, y = self.tree_nav.to_world(x, y)
         hit = drawing.hit_node(self.tree_hits, x, y)
         if hit is not None:
             self.select(hit)
-
-    def _show_node_info(self):
-        if self.selected is None:
-            set_text(self.node_info, "Seleccione un nodo.")
-            return
-        out = self.ctl.describe(self.selected)
-        set_text(self.node_info, out.message)
 
     def _need_selection(self):
         if self.selected is None:
@@ -307,8 +675,14 @@ class App:
         frame.pack(fill="x")
         panes = ttk.Panedwindow(tab, orient="horizontal")
         panes.pack(fill="both", expand=True)
-        left, self.cmp_avl = canvas_with_bars(panes, 600, 380)
-        right, self.cmp_bst = canvas_with_bars(panes, 600, 380)
+        left = ttk.Frame(panes)
+        right = ttk.Frame(panes)
+        ttk.Label(left, text="AVL balanceado", style="Card.TLabel").pack(anchor="w", padx=6, pady=4)
+        ttk.Label(right, text="BST sin balanceo", style="Card.TLabel").pack(anchor="w", padx=6, pady=4)
+        canvas_frame, self.cmp_avl = canvas_with_bars(left, 600, 380)
+        canvas_frame.pack(fill="both", expand=True)
+        canvas_frame, self.cmp_bst = canvas_with_bars(right, 600, 380)
+        canvas_frame.pack(fill="both", expand=True)
         panes.add(left, weight=1)
         panes.add(right, weight=1)
 
@@ -371,55 +745,34 @@ class App:
 
     def _tab_events(self, tab):
         left = ttk.Frame(tab)
-        left.pack(side="left", fill="both", expand=True)
+        left.pack(fill="both", expand=True, padx=7, pady=7)
+        ttk.Label(left, text="Catálogo completo · seleccione una fila para abrir el detalle",
+                  style="Muted.TLabel").pack(anchor="w", pady=(0, 5))
         frame, self.ev_table = table(left, EVENT_COLUMNS, height=22)
         frame.pack(fill="both", expand=True)
         self.ev_table.bind("<<TreeviewSelect>>", self._pick_event_row)
-        right = ttk.Frame(tab)
-        right.pack(side="right", fill="y", padx=6)
-        box = ttk.LabelFrame(right, text="Alta de evento")
-        box.pack(fill="x", pady=3)
-        defaults = {"station": "", "time": format_time(self.ctl.catalog.clock)}
-        self.new_vars = form(box, EVENT_FIELDS, defaults=defaults)
-        ttk.Button(box, text="Crear evento", command=self.do_create).grid(row=len(EVENT_FIELDS), column=0,
-                                                                         columnspan=2, pady=3)
-        box2 = ttk.LabelFrame(right, text="Corrección / eliminación (use la fila seleccionada)")
-        box2.pack(fill="x", pady=3)
-        self.fix_id = tk.StringVar()
-        ttk.Label(box2, text="Evento").grid(row=0, column=0, sticky="w", padx=3)
-        ttk.Entry(box2, textvariable=self.fix_id, width=18).grid(row=0, column=1, padx=3)
-        self.fix_vars = form(box2, CORRECT_FIELDS, row=1)
-        ttk.Label(box2, text="Deje vacío lo que no cambia").grid(row=6, column=0, columnspan=2)
-        btns = ttk.Frame(box2)
-        btns.grid(row=7, column=0, columnspan=2, pady=3)
-        ttk.Button(btns, text="Corregir…", command=self.do_correct).pack(side="left", padx=2)
-        ttk.Button(btns, text="Eliminar…", command=self.do_delete).pack(side="left", padx=2)
-        ttk.Button(btns, text="Revisado", command=self.do_review).pack(side="left", padx=2)
-        frame, self.ev_info = text_box(right, height=8, width=44)
-        frame.pack(fill="x", pady=3)
 
         def refresh():
             fill(self.ev_table, self.ctl.event_rows())
-            if self.selected is not None:
-                set_text(self.ev_info, self.ctl.describe(self.selected).message)
         return refresh
 
     def _pick_event_row(self, _event):
         picked = self.ev_table.selection()
         if picked:
             text = self.ev_table.item(picked[0], "values")[0]
-            self.fix_id.set(text)
             try:
-                self.selected = int(str(text).replace("SIS-", ""))
+                event_id = int(str(text).replace("SIS-", ""))
             except ValueError:
                 return
-            set_text(self.ev_info, self.ctl.describe(self.selected).message)
+            self.select(event_id)
 
     def do_create(self):
         v = {k: var.get().strip() for k, var in self.new_vars.items()}
-        if self.act(self.ctl.create(v["id"], v["magnitude"], v["depth"], v["x"], v["y"], v["time"],
-                                    v["station"])):
-            self.selected = int(v["id"].upper().replace("SIS-", ""))
+        out = self.ctl.create(v["id"], v["magnitude"], v["depth"], v["x"], v["y"], v["time"],
+                              v["station"])
+        if out.ok:
+            self.selected = out.data
+        self.act(out)
 
     def _fix_changes(self):
         return {k: var.get().strip() for k, var in self.fix_vars.items() if var.get().strip()}
@@ -444,6 +797,8 @@ class App:
     def _tab_queue(self, tab):
         top = ttk.Frame(tab)
         top.pack(fill="both", expand=True)
+        right = ttk.LabelFrame(top, text="Preparar ráfaga")
+        right.pack(side="right", fill="y", padx=6)
         left = ttk.Frame(top)
         left.pack(side="left", fill="both", expand=True)
         ttk.Label(left, text="Cola FIFO (el primero de la lista se procesa primero)").pack(anchor="w")
@@ -462,11 +817,10 @@ class App:
         frame, self.q_results = table(left, [("estación", 70), ("evento", 80), ("rev", 35),
                                               ("decisión", 80), ("giros", 160), ("explicación", 420)], 9)
         frame.pack(fill="both", expand=True)
-        right = ttk.LabelFrame(top, text="Preparar ráfaga")
-        right.pack(side="right", fill="y", padx=6)
         defaults = {"revision": "1", "time": format_time(self.ctl.catalog.clock)}
-        self.burst_vars = form(right, BURST_FIELDS, defaults=defaults, width=20)
-        row = len(BURST_FIELDS)
+        self.burst_vars = form(right, BURST_FIELDS, defaults=defaults, width=20,
+                               on_enter=self.add_draft)
+        row = 2 * len(BURST_FIELDS)
         ttk.Button(right, text="Agregar al borrador", command=self.add_draft).grid(row=row, column=0,
                                                                                   columnspan=2, pady=2)
         self.draft_label = ttk.Label(right, text="Borrador: 0 reporte(s)")
@@ -514,25 +868,35 @@ class App:
         return out.ok
 
     def start_continuous(self):
+        if self.running:
+            self.say(self._ok("El procesamiento continuo ya está en marcha."))
+            return
         self.running = True
         self.say(self._ok("Procesamiento continuo iniciado (un reporte por tick)."))
         self._tick()
 
     def stop_continuous(self):
         self.running = False
+        if self._queue_after is not None:
+            self.root.after_cancel(self._queue_after)
+            self._queue_after = None
         self.say(self._ok("Procesamiento continuo en pausa."))
 
     def _tick(self):
         if not self.running:
             return
+        self._queue_after = None
         if not self.do_step(continuous=True):
             self.running = False              # empty queue or recovery pause: stop, the log says why
+            return
+        if self.ctl.queue.is_empty():
+            self.running = False
             return
         try:
             delay = max(50, int(self.delay.get()))
         except ValueError:
             delay = 700
-        self.root.after(delay, self._tick)
+        self._queue_after = self.root.after(delay, self._tick)
 
     # ---------- tab: history ----------
 
@@ -649,6 +1013,30 @@ class App:
             set_text(self.ind_box, self.ctl.indicators_text() + "\n\n" + self.ctl.traversal_text())
         return refresh
 
+    def _tab_indicators(self, tab):
+        ttk.Label(tab, text="Indicadores operativos del catálogo", style="Brand.TLabel").pack(
+            anchor="w", padx=10, pady=10)
+        cards = ttk.Frame(tab)
+        cards.pack(fill="x", padx=7)
+        self.indicator_cards = {}
+        for column, (name, label) in enumerate((
+                ("active", "Activos"), ("archived", "Archivados"), ("deleted", "Eliminados"),
+                ("queue", "Cola FIFO"), ("pending", "Pendientes"), ("costly_access", "Costosos"),
+                ("height", "Altura AVL"), ("leaves", "Hojas"))):
+            card, value = widgets.metric_card(cards, label)
+            card.grid(row=0, column=column, sticky="ew", padx=3, pady=3)
+            cards.columnconfigure(column, weight=1)
+            self.indicator_cards[name] = value
+        frame, self.indicator_report = text_box(tab, height=18, width=100)
+        frame.pack(fill="both", expand=True, padx=8, pady=8)
+
+        def refresh():
+            data = indicators(self.ctl.catalog, self.ctl.queue)
+            for key, value in self.indicator_cards.items():
+                value.configure(text=str(data[key]))
+            set_text(self.indicator_report, self.ctl.indicators_text())
+        return refresh
+
     def run_audit(self):
         out = self.ctl.audit()
         set_text(self.audit_box, out.message)
@@ -672,9 +1060,10 @@ class App:
             for c, (var, label) in enumerate(fields, start=1):
                 sub = ttk.Frame(grid)
                 sub.grid(row=r, column=c, padx=3)
-                ttk.Label(sub, text=label).pack(side="left")
-                ttk.Entry(sub, textvariable=self.q[var], width=22 if var in ("start", "end") else 8
-                          ).pack(side="left")
+                ttk.Label(sub, text=label).grid(row=0, column=0, sticky="w")
+                ttk.Entry(sub, textvariable=self.q[var],
+                          width=22 if var in ("start", "end") else 8
+                          ).grid(row=1, column=0, sticky="ew")
             ttk.Button(grid, text="Consultar", command=lambda n=name: self.run_query(n)
                        ).grid(row=r, column=5, padx=6)
         frame, self.query_box = text_box(tab, height=22, width=140)
@@ -690,9 +1079,9 @@ class App:
 
 
 def main():
-    root = tk.Tk()
-    App(root)
-    root.mainloop()
+    from ui.main_window import launch
+
+    launch()
 
 
 if __name__ == "__main__":

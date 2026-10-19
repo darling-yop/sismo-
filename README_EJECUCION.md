@@ -1,13 +1,23 @@
-# SismoLab AVL - ejecución (Windows, Python 3.12)
+# SismoLab AVL - Guía de inicio (Windows)
 
-Desde la raíz del repo:
+## 1. Cómo iniciar el programa
 
-    python main.py                                              # abre la interfaz Tkinter
-    python -m unittest discover -s tests -t .                   # 163 pruebas
-    python -m scripts.build_data                                # regenera data/*.json (determinista)
-    python -m scripts.run_cases                                 # esperado vs obtenido -> docs/casos_seccion16.md
+1. Asegúrate de tener instalado Python 3.12 o una versión superior.
+2. Abre una terminal en la carpeta del proyecto.
+3. Ejecuta el siguiente comando:
 
-Archivos de prueba (se eligen con el explorador, pestaña "Archivos y versiones"):
-- Carga por inserciones: data/carga_inserciones_{aleatoria,ascendente,descendente}.json
-- Carga por topología: data/topologia_normal.json, data/topologia_estres.json, data/topologia_inconsistente.json (debe rechazarse)
-- Ráfagas: cargue data/estado_inicial_rafaga.json (topología) y luego data/rafaga_mixta.json en la pestaña "Cola"
+   `python main.py`
+
+4. Se abrirá la interfaz del programa, desde donde podrás utilizar sus funciones.
+
+## 2. Archivos de prueba
+
+En la pestaña **«Archivos y versiones»**, puedes seleccionar diferentes archivos para probar el funcionamiento del programa.
+
+- **Inserciones:** permite probar árboles con datos aleatorios, ordenados de menor a mayor o de mayor a menor.
+- **Topologías:** permite probar diferentes estructuras de árboles, incluidas algunas que el programa debe rechazar por ser inconsistentes.
+- **Ráfagas:** permite probar una secuencia de operaciones. Primero, carga `estado_inicial_rafaga.json` en la pestaña de topología y después `rafaga_mixta.json` en la pestaña «Cola».
+
+## 3. Información para desarrolladores
+
+Para ejecutar las pruebas automáticas, generar los archivos de datos y comprobar los resultados esperados, consulta las instrucciones técnicas del proyecto.

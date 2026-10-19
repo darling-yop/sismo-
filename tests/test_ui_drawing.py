@@ -81,6 +81,14 @@ class PlaneDrawingTest(unittest.TestCase):
         self.assertEqual(hit_point(hits, cx, cy), hits[0][0])
         self.assertIsNone(hit_point(hits, -100, -100))
 
+    def test_plane_zooms_to_events(self):
+        c = build()
+        canvas = FakeCanvas()
+        hits = draw_plane(canvas, c.plane_view(), size=640)
+        center = 36 + 640 / 2
+        self.assertTrue(all(abs(x - center) < 1 for _, x, _, _ in hits))
+        self.assertTrue(all(abs(y - center) < 1 for _, _, y, _ in hits))
+
 
 if __name__ == "__main__":
     unittest.main()
